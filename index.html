@@ -1,0 +1,499 @@
+<html>
+   <head>
+      <style>
+        
+        div{
+          vertical-align:top;
+          box-sizing:border-box;
+          margin:0px;
+          border:0px;
+          padding:0px;
+        }
+
+        body{
+          background-color:#2921a7;
+          font-family:arial,sans;
+        }
+        
+        #content{
+          width:1000px;
+          margin-left:auto;
+          margin-right:auto;
+        }
+
+        #content #header{
+          color:#FFFFFF;
+          padding-top:10px;
+          padding-bottom:10px;
+          font-size:24;
+        }
+
+        
+        #content .days{
+          margin-left:auto;  
+          margin-right:auto;  
+          margin:2px;
+        }
+
+        #content .day{
+          padding:2px;
+          margin:2px;
+          vertical-align:top;
+        }
+
+        #content .column{
+          display:inline-block; 
+        }
+
+        #content .labels .label{
+          width:200px;
+          color:#FFFFFF;  
+        }
+
+        #content #buttonBar{
+          background-color:#0036ce;  
+          padding:5px;
+        }
+        
+        #content .label{
+          height:33px;
+          width:100px;
+          border-bottom: 1px solid #3054b9;
+          padding:6px;
+        }
+
+        #content #hours .label{
+          min-width:80px;
+          color:#FFFFFF;
+        }
+
+        
+        #content .button_day{
+          display:inline-block;  
+          padding:5px;
+          color:#6e83ea;
+        }
+
+        #content .hour00{ background-color:#000000; }  
+        #content .hour03{ background-color:#00134d; }  
+        #content .hour06{ background-color:#002db3; }  
+        #content .hour09{ background-color:#4d79ff; }  
+        #content .hour12{ background-color:#47a6f7; }  
+        #content .hour15{ background-color:#3399ff; }  
+        #content .hour18{ background-color:#1b69de; }  
+        #content .hour21{ background-color:#250898; }  
+        
+      </style>
+      <script >  
+      
+       /*
+        * Class Init
+        * Upon instantiation call the getData function
+        */
+        function Init(){
+          this.getData();
+        }
+
+       /*
+        * Init run
+        * Set the data and render it on the page
+        */
+        Init.prototype.run = function(data){
+          this.city = data.city.name;
+          this.days = {};    
+          this.prepareData(data);
+          this.render();
+        }
+        
+       /*
+        * Init getData
+        * Execute an AJAX call to retrieve the forecast information, upon receiving the data
+        * trigger the callback function 
+        */
+        Init.prototype.getData = function(){
+        
+          var init = this;
+          
+          var ajaxGet = new XMLHttpRequest();
+          var url = 'http://api.openweathermap.org/data/2.5/forecast/city?q=London,UK&units=metric&APPID=852b3e772b3442ce98cfd3c017a73bde';
+          var data;
+          ajaxGet.onreadystatechange = function(){
+              if (ajaxGet.readyState == XMLHttpRequest.DONE ){
+              
+                  if (ajaxGet.status == 200){
+                      var data = JSON.parse(ajaxGet.responseText);   
+                      //Call back function
+                      init.run(data);
+                  }else{
+                      console.log(ajaxGet.status);
+                  }
+              }
+          }        
+          ajaxGet.open("GET", url, true);
+          ajaxGet.send();
+          return data;
+        }
+        
+        
+       /*
+        * Init dayOfWeek
+        * @param day, the numeric representation of the day of the week
+        * @return the named day of the week
+        */
+        Init.prototype.dayOfWeek = function(day){
+          return ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][day];        
+        }
+
+       /*
+        * Init month
+        * @param day, the numeric representation of the day of the week
+        * @return the named day of the week
+        */
+        Init.prototype.month = function(month){
+          return ["January", "February", "March", "April", "May", "June","July", "August", "September", "October", "November", "December"][month];        
+        }
+        
+       /*
+        * Init prepareData
+        * The API data are returned as a list of objects each one of them representing the 
+        * Forecast data every 3 hours for the next five days, the first thing to do is to  
+        * run trought said list and devide it by days and then intervals for later easier access
+        * 
+        * @param data, the object retuned from the API
+        */
+        Init.prototype.prepareData = function(data){
+
+          var item;  
+          var date;
+          var index;
+          var month;
+          
+          for(var d = 0; d < data.list.length; d++){
+          
+            item  = data.list[d];
+            date  = new Date(item.dt_txt);
+            month = date.getMonth(); 
+            
+            //Day of week (numeric)
+            item.dow  = date.getDay(); 
+            
+            //Month (name)
+            item.month = this.month(month); 
+            
+            //Hour
+            item.hour = date.getHours();
+
+            //Day of week (Name)
+            item.day  = this.dayOfWeek(item.dow);
+            
+            //Day in month
+            item.dom  = date.getDate(); 
+            
+            //Day in month
+            item.year  = date.getFullYear(); 
+            
+            //The days will be indexed with a concatenation of a string(an underscore) with the numeric value,
+            //This to avoid the keys to be sorted numerically (i.e. Sunday will be 0 hence it will be elaborated always first otherwise)
+            index = '_'+item.dow; 
+
+            //Organize the list by day
+            this.days[index] = this.days[index] || new Day(item);
+            
+            //And then by 3 hours intervals  
+            this.days[index]['intvals'].push(new TimeInterval(item)); 
+        
+          }
+         
+          //void the original data object
+          data = ''; 
+        }
+
+       /*
+        * Init render
+        * Finally render the data on the page
+        */
+        Init.prototype.render = function(){
+
+          //Instantiate the Template class
+          var template = new Template(this);
+
+          //Counter
+          var c = 0;
+          
+          //Display the first day available  
+          for(var d in this.days){
+
+            //Set the header for the first day in the list
+            if(c === 0){ 
+              template.header(d);
+            }             
+          
+            //Create the button bar for the provided 5 days 
+            template.daylyButtons(d);
+            template.dailyContent(d);
+            return;
+            
+            c++
+          }
+          
+        }        
+        
+        
+       /*
+        * Class Day
+        * Create a Day object
+        * @param data, the JSON object containing the data
+        */
+        function Day(data){
+        
+          this.date    = data.dt_txt;
+          this.dow     = data.dow;
+          this.day     = data.day;
+          this.dom     = data.dom;
+          this.year    = data.year;
+          this.month   = data.month;
+          this.intvals = [];    
+        
+        }
+        
+       /*
+        * Class TimeInterval
+        * Create a TimeInterval object, extract the relevant information and set 
+        * The property to "false" if the relevant data are empty 
+        * @param data, the JSON object containing the data
+        */
+        function TimeInterval(data){
+          
+          this.hour    = data.hour; 
+          this.w_id    = data.weather[0].id; 
+          this.rain    = (data.hasOwnProperty('rain')) ? data.rain['3h'] : false;  
+          this.max     = data.main.temp_max       || false;  
+          this.min     = data.main.temp_min       || false;   
+          this.avg     = data.main.temp           || false;  
+          this.hum     = data.main.humidity       || false;  
+          this.prs     = data.main.pressure       || false;  
+          this.sea     = data.main.sea_level      || false;  
+          this.clouds  = data.clouds.all          || false;  
+          this.wind_d  = data.wind.deg.toFixed(2) || false;  
+          this.wind_s  = data.wind.speed          || false;  
+          
+        }        
+        
+
+       /*
+        * Class Template
+        * @param data, the object containing the data
+        */
+        function Template(data){
+          this.data = data;
+        }
+        
+       /*
+        * Template createElement
+        * Wrapper for the creation on an HTML DOM Element
+        * @param name, the tag name of the element 
+        * @param className, the class of to the element
+        * @param html, the string content of the element, if any is passed
+        * @return an HTML element
+        */
+        Template.prototype.createElement = function(name,className,html){
+        
+          var element           = document.createElement(name);
+              element.className = className;
+              
+          if(html) element.innerHTML = html;      
+          return element;
+          
+        }
+        
+       /*
+        * Template header
+        */
+        Template.prototype.header = function(d){
+          
+          var target = document.getElementById('headerInfo');
+              target.innerHTML = '';
+
+          var headerString = this.data.city+', '+this.data.days[d].day+' '+this.data.days[d].dom+' '+this.data.days[d].month+' '+this.data.days[d].year;
+              
+          target.appendChild(this.createElement('span', 'day', headerString ));
+        
+        }
+        
+       /*
+        * Template daylyButtons
+        * Create the butt bar with the days, change the color of the selected one and
+        * append it to its target element
+        * @param selected, the numeric representation of the day of the week
+        */
+        Template.prototype.daylyButtons = function(selected){
+        
+          var target = document.getElementById('buttonBar');
+              target.innerHTML = '';
+        
+          for(var d in this.data.days){
+            var button = this.daylyButton(d);
+            if(selected && selected == d){
+              button.style.color = '#FFFFFF';
+            } 
+            target.appendChild(button);
+          }
+          
+        }
+
+       /*
+        * Template daylyButton
+        * Create the single button and apply an event listener to it: 
+        * each time a button is clicked it will refresh its own button list and the content with the
+        * daily forecast
+        * @param d, the numeric representation of the day of the week
+        * @return a button representing the day 
+        */
+        Template.prototype.daylyButton = function(d){
+
+          var obj = this;
+          var daylyButton = this.createElement('div', 'button_day', this.data.days[d].day);
+          
+          //Add an event listener so we can select the different days
+          daylyButton.addEventListener("click", function(){
+              obj.daylyButtons(d);
+              obj.dailyContent(d,false); 
+              obj.header(d);
+          }, false);
+        
+          return daylyButton;
+          
+        }
+
+        
+       /*
+        * Template hourlyColumn
+        * Create a column representing all the forecast info for the given hourly interval
+        * @param data, the forecast data for the given interval
+        * @return a column with with all the data for the given interval
+        */
+        Template.prototype.hourlyColumn = function(data){
+        
+          var fixHour      = (data.hour < 10) ? String('0'+data.hour):data.hour ;
+          var hourlyColumn = this.createElement('div',  'column hour'+fixHour , false);
+            
+          var avg  = (data.avg)    ? data.avg+'&deg;'            : false;  
+          var min  = (data.min)    ? data.min+'&deg;'            : false;  
+          var max  = (data.max)    ? data.max+'&deg;'            : false;  
+          var wind = (data.wind_s) ? data.wind_s+'/'+data.wind_d : false;  
+          
+          var hour = this.createElement('div',  'label' , fixHour);
+          var avg  = this.createElement('div',  'label' , avg);
+          var min  = this.createElement('div',  'label' , min);
+          var max  = this.createElement('div',  'label' , max);
+          var hum  = this.createElement('div',  'label' , data.hum);
+          var prs  = this.createElement('div',  'label' , data.prs);
+          var rain = this.createElement('div',  'label' , data.rain);
+          var wind = this.createElement('div',  'label' , wind);  
+
+          hourlyColumn.appendChild(hour);
+          hourlyColumn.appendChild(avg);
+          hourlyColumn.appendChild(min);
+          hourlyColumn.appendChild(max);
+          hourlyColumn.appendChild(hum);
+          hourlyColumn.appendChild(prs);
+          hourlyColumn.appendChild(rain);
+          hourlyColumn.appendChild(wind);
+          
+          return hourlyColumn;
+          
+        }
+
+       /*
+        * Template dailyContent
+        * Create the content for the given day of the week 
+        * Each day consist of 8 3 hours intervals
+        * For the current day if there are lesst than 8 intervals it will add the next day remaing ones   
+        * @param d, the numeric representation of the day of the week
+        * @param stopAt, if passed will stop adding interval columns at the given value  
+        */
+        Template.prototype.dailyContent = function(d,stopAt){
+
+          //Exit if there's not day set (this happen )
+          if(!this.data.days.hasOwnProperty(d)) return;
+        
+          var day = this.data.days[d];
+          
+          //We wan to set the last interval hour if we need to add empty slots later
+          var lastIntervalHour;
+
+          //Set the target element and remove all existing content
+          var target = document.getElementById('hours');
+
+          //Delete the Target content only when an entire Day's intervals are to be displayed   
+          if(!stopAt) target.innerHTML = ''; 
+          
+          //Create all the available hourly intervals for the day 
+          for(var i = 0; i < day.intvals.length; i++){
+            target.appendChild(this.hourlyColumn(day.intvals[i]));
+            lastIntervalHour = parseInt(day.intvals[i].hour,10);
+            if(stopAt && stopAt == i) return;
+          }
+
+          //If the slots are all complete for the day just stop here   
+          if(day.intvals.length == 8) return;
+          
+          //If the intervals are less than 8 extract the numeric index for the day object
+          var index = d.substring(1);
+        
+          //Extract the numeric representation of the next day
+          //If the day is equal to 6 (Sunday) the next one will be 0 (Monday)
+          var nextDay = (index == '6') ?  '_0' :  '_'+(parseInt(index,10) + 1);
+          
+          //The number of missing intervals
+          var missingSlots = (7 - day.intvals.length);
+          
+          //Now check if the day exists, if it does it will take the missing slots from the next day
+          if(this.data.days.hasOwnProperty(nextDay)){
+            this.dailyContent(nextDay,missingSlots);
+            return;
+          }
+            
+          //If it doesn't it will create empty slots instead (case of last day)
+          for(var s = 0; s < missingSlots+1; s++){
+            
+            day = {};
+            day.hour = lastIntervalHour + 3*(s+1);
+            
+            target.appendChild(this.hourlyColumn(day));
+          
+          }
+          
+          return;
+        }
+        
+
+        //Entry point  
+        window.onload = function(){
+          new Init();    
+        }
+        
+        
+    </script>          
+    
+    
+   </head>
+   <body>
+    <div id='content'>
+      <div id='header'>5 days weather forecast for <span id='headerInfo'></span></div>
+      <div id='buttonBar'></div>
+      <div id='day'>
+        <div class="column labels">
+          <div class="label">Hours</div>
+          <div class="label">Temperature</div>
+          <div class="label">Min</div>
+          <div class="label">Max</div>
+          <div class="label">Humidity (%)</div>
+          <div class="label">Pressure (hPa)</div>
+          <div class="label">Rain (%)</div>
+          <div class="label">Wind (Knots/Direction)</div>
+        </div><div class="column" id='hours'></div>
+      </div>
+    </div>
+   </body> 
+</html>
