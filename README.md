@@ -3,7 +3,7 @@ A graphic representation of the 5 days weather forecast using https://openweathe
 
 What it does 
 
-1 - Get the forecast data from the aforementioned API 
+1 - Get the forecast data from the aforementioned API
 2 - Organize the data dividing the returned forecast list by days and hours intervals 
 3 - Run the newly organized data structure and apply the relevant templates 
 
